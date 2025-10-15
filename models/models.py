@@ -1,5 +1,4 @@
 import numpy
-from typing import Tuple
 from numpy.typing import NDArray
 
 
@@ -67,5 +66,3 @@ class Logistic:
         delta: NDArray[numpy.float64] = weight - w0
         self.set_model_weight(weight)
         return delta
-
-
