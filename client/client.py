@@ -27,7 +27,7 @@ def client(
             "client_id": client_id
         }
     )
- 
+
     feature_weights = requests.get(f"{base}/model").json()["feature_weight"]
     X_matrix, y = generate_dataset_local(
         samples,
@@ -103,7 +103,7 @@ def client(
 
 @click.command(context_settings={"help_option_names": ["-h", "--help"]})
 @click.option("--server", default="http://127.0.0.1:8000", show_default=True, help="Base URL for the server.")
-@click.option("--client-id", default="client_id", required=True, help="Unique client identifier.")
+@click.option("--client-id", "client_id", required=True, help="Unique client identifier.")
 @click.option("--samples", type=int, default=300, show_default=True, help="Number of local samples to generate.")
 @click.option("--rounds", type=int, default=5, show_default=True, help="Number of federated rounds to participate in.")
 @click.option("--lr", type=float, default=0.5, show_default=True, help="Learning rate for local update.")
