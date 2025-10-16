@@ -93,3 +93,32 @@ def submit_update() -> Response | Tuple[Response, int]:
             "all_received": completed
         }
     )
+
+@app.route("/finish-round", methods=["POST"])
+def finish_round() -> Response | Tuple[Response, int]:
+    if not model_state.all_received():
+        return jsonify(
+            {
+                "OK": False,
+                "error_message": "incomplete"
+            }
+        ), 400
+    round_status: int = model_state.process_and_update_to_global_model()
+    return jsonify(
+        {
+            "OK": True,
+            "round": round_status,
+            "weight": model_state.get_model_weight().tolist()
+        }
+    )
+    
+@app.route("/status", methods=["GET"])
+def model_status() -> Response:
+    return jsonify(
+        {
+            "round": model_state.round,
+            "registered": model_state.registered,
+            "expected": list(model_state.expected),
+            "received": list(model_state.updates.keys())
+        }    
+    )
