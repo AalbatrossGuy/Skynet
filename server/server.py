@@ -2,8 +2,8 @@ import os
 import numpy
 from numpy.typing import NDArray
 from model_state import GlobalModelState
-from typing import Any, Dict, Iterable, List, Set, Tuple
-from flask import Flask, request, jsonify, send_from_directory, Response
+from typing import Any, Dict, Iterable, Tuple
+from flask import Flask, request, jsonify, Response
 
 ROOT_DIRECTORY: str = os.path.dirname(os.path.dirname(__file__))
 
@@ -94,7 +94,8 @@ def submit_update() -> Response | Tuple[Response, int]:
         }
     )
 
-@app.route("/finish-round", methods=["POST"])
+
+@server.route("/finish-round", methods=["POST"])
 def finish_round() -> Response | Tuple[Response, int]:
     if not model_state.all_received():
         return jsonify(
@@ -111,8 +112,9 @@ def finish_round() -> Response | Tuple[Response, int]:
             "weight": model_state.get_model_weight().tolist()
         }
     )
-    
-@app.route("/status", methods=["GET"])
+
+
+@server.route("/status", methods=["GET"])
 def model_status() -> Response:
     return jsonify(
         {
@@ -120,5 +122,5 @@ def model_status() -> Response:
             "registered": model_state.registered,
             "expected": list(model_state.expected),
             "received": list(model_state.updates.keys())
-        }    
+        }
     )
