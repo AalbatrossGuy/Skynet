@@ -1,0 +1,5 @@
+flask
+requests
+numpy
+scikit-learn
+click
