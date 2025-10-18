@@ -21,6 +21,7 @@ def client(
     seed: int
 ):
     base = server.rstrip("/")
+
     requests.post(
         f"{base}/register",
         json={
@@ -28,21 +29,29 @@ def client(
         }
     )
 
-    feature_weights = requests.get(f"{base}/model").json()["feature_weight"]
+    feature_weights = requests.get(f"{base}/model").json()
+    n_features: int = int(feature_weights["feature_weight"])
     X_matrix, y = generate_dataset_local(
         samples,
-        feature_weights,
+        n_features,
         seed + hash(client_id) % 1000
     )
-    model: Logistic = Logistic(feature_weights)
+    y = numpy.asarray(y, dtype=numpy.float64).ravel()
+    model: Logistic = Logistic(n_features)
 
     for _ in range(int(rounds)):
         model_info: Dict[str, Any] = requests.get(f"{base}/model").json()
-        weights: NDArray[numpy.float64] = numpy.array(
-            model_info["feature_weight"],
+        weights: NDArray[numpy.float64] = numpy.asarray(
+            model_info["training_weights"],
             dtype=numpy.float64
-        )
+        ).ravel()
         model.set_model_weight(weights)
+
+        while True:
+            st = requests.get(f"{base}/status").json()
+            if st.get("round") == int(model_info["training_round"]) and client_id in st.get("expected", []):
+                break
+            time.sleep(0.5)
 
         delta: NDArray[numpy.float64] = model.update_local(
             feature_matrix=X_matrix,
@@ -52,8 +61,8 @@ def client(
         )
         roster_response: Dict[str, Any] = requests.get(f"{base}/roster").json()
         roster: List[str] = list(roster_response["clients"])
-        dimensions: int = int(delta.shape[0])
-        mask: NDArray[numpy.float64] = numpy.zeroes(
+        dimensions: int = delta.shape[0]
+        mask: NDArray[numpy.float64] = numpy.zeros(
             dimensions,
             dtype=numpy.float64
         )
@@ -75,37 +84,63 @@ def client(
         masked: List[float] = (delta + mask).astype(float).tolist()
         send_body: Dict[str, Any] = {
             "client_id": client_id,
-            "round": int(model_info["round"]),
+            "round": int(model_info["training_round"]),
             "masked_update": masked
         }
-        response: Dict[str, Any] = requests.post(
-            url=f"{base}/submit-update",
-            json=send_body
-        ).json()
+        print(f"[{client_id}] DEBUG about to POST /submit-update; "
+            f"round={model_info['training_round']} len={len(masked)} base={base}", flush=True)
 
-        print(f"[{client_id}] round={model_info['round']}\
-        received={response.get('received')}")
+        # response: Dict[str, Any] = requests.post(
+        #     url=f"{base}/submit-update",
+        #     json=send_body
+        # )
+        #
+        # response = response.json() if response.content else {}
+        #
+        resp = requests.post(f"{base}/submit-update", json=send_body, timeout=10)
+        print(f"[{client_id}] DEBUG POST status={resp.status_code}", flush=True)
+        try:
+            rj = resp.json() if resp.content else {}
+        except ValueError:
+            rj = {}
+        print(f"[{client_id}] submit-update received={rj.get('received')} "
+        f"all_received={rj.get('all_received')}", flush=True)
+        print(f"[{client_id}] round={model_info['training_round']} received={rj.get('received')}")
 
-        time.sleep(0.5)
+        # print(f"[{client_id}] round={model_info['training_round']}\
+        # received={response.get('received')}")
 
+        # time.sleep(0.5)
+        #
+        # while True:
+        #     status_response: Dict[str, Any] = requests.get(
+        #         f"{base}/status"
+        #     ).json()
+        #     if not list(status_response["expected"]):
+        #         break
+        #     time.sleep(0.5)
+
+        target_round = int(model_info["training_round"]) + 1
         while True:
-            status_response: Dict[str, Any] = requests.get(
-                f"{base}/status"
-            ).json()
-            if not list(status_response["expected"]):
-                break
-            time.sleep(0.5)
+            time.sleep(1) 
+            try:
+                current_model_info: Dict[str, Any] = requests.get(f"{base}/model").json()
+                current_round: int = current_model_info["training_round"]
+                if current_round >= target_round:
+                    break
+            except requests.exceptions.ConnectionError:
+                continue
 
         accuracy: float = float(accuracy_score(y, model.predict(X_matrix)))
         print(f"[{client_id}] local accuracy \
-        after round {model_info['round']}: {accuracy: .3f}")
+        after round {model_info['training_round']}: {accuracy: .3f}")
 
 
 @click.command(context_settings={"help_option_names": ["-h", "--help"]})
 @click.option("--server", default="http://127.0.0.1:8000", show_default=True, help="Base URL for the server.")
 @click.option("--client-id", "client_id", required=True, help="Unique client identifier.")
 @click.option("--samples", type=int, default=300, show_default=True, help="Number of local samples to generate.")
-@click.option("--rounds", type=int, default=5, show_default=True, help="Number of federated rounds to participate in.")
+@click.option("--rounds", type=int, default=30, show_default=True, help="Number of federated rounds to participate in.")
 @click.option("--lr", type=float, default=0.5, show_default=True, help="Learning rate for local update.")
 @click.option("--seed", type=int, default=1234, show_default=True, help="Base RNG seed for local data generation.")
 def skynet_cli(server: str, client_id: str, samples: int, rounds: int, lr: float, seed: int) -> None:
