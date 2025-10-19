@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# ---------- Paths & Config ----------
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 VENV_DIR="${PROJECT_ROOT}/.venv"
 REQ_FILE="${PROJECT_ROOT}/requirements.txt"
@@ -22,7 +21,6 @@ LOG_DIR="${PROJECT_ROOT}/logs"
 PID_DIR="${PROJECT_ROOT}/.pids"
 mkdir -p "${LOG_DIR}" "${PID_DIR}"
 
-# Export defaults (requested)
 EXPORT_DIR="${EXPORT_DIR:-${LOG_DIR}/exports}"
 EXPORT_BASENAME="${EXPORT_BASENAME:-model_state_summary.json}"  # exact filename by default
 AUTO_STOP="${AUTO_STOP:-1}"                                     # stop everything after export by default
@@ -35,13 +33,11 @@ CLIENT_PIDS_FILE="${PID_DIR}/clients.pids"
 
 PYTHON="${VENV_DIR}/bin/python"
 
-# ---------- Helpers ----------
 ensure_venv() {
   if [[ ! -x "${PYTHON}" ]]; then
     echo "[*] Creating virtualenv at ${VENV_DIR}"
     python3 -m venv "${VENV_DIR}"
   fi
-  # shellcheck disable=SC1090
   source "${VENV_DIR}/bin/activate"
   echo "[*] Installing requirements"
   pip install -r "${REQ_FILE}"
@@ -71,7 +67,6 @@ wait_for_server() {
   return 1
 }
 
-# Use venv Python to parse /model; retry a few times to avoid transient misses
 get_training_round() {
   local out rc
   for _ in {1..10}; do
@@ -89,7 +84,6 @@ PY
   return 1
 }
 
-# Wait until a PID exits (works even if not a child of this shell)
 wait_pid_exit() {
   local pid="$1"
   [[ -z "$pid" ]] && return 0
@@ -98,7 +92,6 @@ wait_pid_exit() {
   done
 }
 
-# ---------- Start/Stop ----------
 start_server() {
   if is_running "${SERVER_PID_FILE}"; then
     echo "[i] Server already running (pid $(cat "${SERVER_PID_FILE}"))"
@@ -207,7 +200,6 @@ tail_logs() {
     "${LOG_DIR}"/client_*.err 2>/dev/null || true
 }
 
-# ---------- Export After Training ----------
 wait_and_export_after_controller() {
   if [[ ! -f "${CONTROLLER_PID_FILE}" ]]; then
     echo "[!] No controller PID file; cannot wait/export"
@@ -224,7 +216,6 @@ wait_and_export_after_controller() {
     echo "[!] Server is unreachable after controller exit; attempting export anyway."
   fi
 
-  # Guarded wait for server to settle rounds
   local have_start="0" target_round=""
   if [[ -n "${START_ROUND:-}" && "${START_ROUND}" =~ ^[0-9]+$ && "${ROUNDS}" =~ ^[0-9]+$ ]]; then
     have_start="1"
@@ -249,7 +240,6 @@ wait_and_export_after_controller() {
       if [[ "${have_start}" == "1" ]]; then
         if (( cur >= target_round )); then echo; break; fi
       else
-        # Stabilization heuristic: same value 3 reads in a row and > 0
         if [[ "${cur}" == "${last}" ]]; then
           same_count=$((same_count+1))
         else
@@ -267,7 +257,6 @@ wait_and_export_after_controller() {
     sleep 1
   done
 
-  # Decide output filename
   local ts out
   ts="$(date +%Y%m%d_%H%M%S)"
   if [[ "${EXPORT_BASENAME}" == *.json ]]; then
@@ -291,7 +280,6 @@ wait_and_export_after_controller() {
   fi
 }
 
-# ---------- CLI ----------
 usage() {
   cat <<EOF
 Usage: $(basename "$0") <command>
@@ -323,7 +311,7 @@ case "${cmd}" in
     ensure_venv
     start_server
     start_clients
-    # Capture starting round before controller begins (retrying)
+
     if START_ROUND="$(get_training_round)"; then
       echo "[*] Starting server round is ${START_ROUND}"
     else
@@ -332,7 +320,6 @@ case "${cmd}" in
     fi
     start_controller
     status
-    # Wait for controller, then export (and stop if AUTO_STOP=1)
     wait_and_export_after_controller
     ;;
   start-server)
