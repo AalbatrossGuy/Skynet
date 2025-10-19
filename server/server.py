@@ -91,6 +91,19 @@ def submit_update() -> Response | Tuple[Response, int]:
             }
         ), 400
 
+    metrics = data.get("metrics") or {}
+    if "accuracy" in metrics:
+        try:
+            accuracy_value = float(metrics["accuracy"])
+            model_state.add_client_metrics(
+                client_id,
+                metric={
+                    "accuracy": accuracy_value
+                }
+            )
+        except Exception:
+            pass
+
     model_state.add_client_data_to_current_model(
         client_id=client_id,
         delta=vector_array
@@ -144,7 +157,7 @@ def export_model_data():
         "feature_weight": model_state.model._dim - 1,
         "training_weights": model_state.model.get_model_weight().tolist(),
         "history": getattr(model_state, "history", []),
-        "export_time": int(time.time())
+        "export_time": time.time()
     }
 
     buffer = io.BytesIO(
