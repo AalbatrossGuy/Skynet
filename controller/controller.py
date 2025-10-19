@@ -74,7 +74,7 @@ def coordinator(
 
 @click.command(context_settings={"help_option_names": ["-h", "--help"]})
 @click.option("--server", default="http://127.0.0.1:8000", show_default=True, help="Base URL of the federated server.")
-@click.option("--rounds", type=int, default=30, show_default=True, help="Number of training rounds to run.")
+@click.option("--rounds", type=int, default=10, show_default=True, help="Number of training rounds to run.")
 @click.option("--min-clients", "min_clients", type=int, default=3, show_default=True, help="Minimum number of clients required to start.")
 def controller_cli(server: str, rounds: int, min_clients: int) -> None:
     coordinator(

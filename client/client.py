@@ -82,10 +82,14 @@ def client(
             mask = mask + vector if client_id < peer else mask - vector
 
         masked: List[float] = (delta + mask).astype(float).tolist()
+        accuracy: float = float(accuracy_score(y, model.predict(X_matrix)))
         send_body: Dict[str, Any] = {
             "client_id": client_id,
             "round": int(model_info["training_round"]),
-            "masked_update": masked
+            "masked_update": masked,
+            "metrics": {
+                "accuracy": accuracy
+            }
         }
         print(f"[{client_id}] DEBUG about to POST /submit-update; "
             f"round={model_info['training_round']} len={len(masked)} base={base}", flush=True)
@@ -131,7 +135,7 @@ def client(
             except requests.exceptions.ConnectionError:
                 continue
 
-        accuracy: float = float(accuracy_score(y, model.predict(X_matrix)))
+        # accuracy: float = float(accuracy_score(y, model.predict(X_matrix)))
         print(f"[{client_id}] local accuracy \
         after round {model_info['training_round']}: {accuracy: .3f}")
 
@@ -140,7 +144,7 @@ def client(
 @click.option("--server", default="http://127.0.0.1:8000", show_default=True, help="Base URL for the server.")
 @click.option("--client-id", "client_id", required=True, help="Unique client identifier.")
 @click.option("--samples", type=int, default=300, show_default=True, help="Number of local samples to generate.")
-@click.option("--rounds", type=int, default=30, show_default=True, help="Number of federated rounds to participate in.")
+@click.option("--rounds", type=int, default=10, show_default=True, help="Number of federated rounds to participate in.")
 @click.option("--lr", type=float, default=0.5, show_default=True, help="Learning rate for local update.")
 @click.option("--seed", type=int, default=1234, show_default=True, help="Base RNG seed for local data generation.")
 def skynet_cli(server: str, client_id: str, samples: int, rounds: int, lr: float, seed: int) -> None:
