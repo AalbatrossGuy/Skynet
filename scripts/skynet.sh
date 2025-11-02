@@ -12,7 +12,7 @@ SERVER_URL="http://${SERVER_HOST}:${SERVER_PORT}"
 ROUNDS="${ROUNDS:-5}"
 MIN_CLIENTS="${MIN_CLIENTS:-3}"
 CLIENT_SAMPLES="${CLIENT_SAMPLES:-300}"
-CLIENT_ROUNDS="${CLIENT_ROUNDS:-10}"
+CLIENT_ROUNDS="${CLIENT_ROUNDS:-5}"
 CLIENT_LR="${CLIENT_LR:-0.5}"
 
 CLIENTS="${CLIENTS:-A B C}"
@@ -22,9 +22,9 @@ PID_DIR="${PROJECT_ROOT}/.pids"
 mkdir -p "${LOG_DIR}" "${PID_DIR}"
 
 EXPORT_DIR="${EXPORT_DIR:-${LOG_DIR}/exports}"
-EXPORT_BASENAME="${EXPORT_BASENAME:-model_state_summary.json}"  # exact filename by default
-AUTO_STOP="${AUTO_STOP:-1}"                                     # stop everything after export by default
-SETTLE_TIMEOUT="${SETTLE_TIMEOUT:-10}"                          # seconds to wait after controller exits
+EXPORT_BASENAME="${EXPORT_BASENAME:-model_state_summary.json}"
+AUTO_STOP="${AUTO_STOP:-1}"
+SETTLE_TIMEOUT="${SETTLE_TIMEOUT:-3}"
 mkdir -p "${EXPORT_DIR}"
 
 SERVER_PID_FILE="${PID_DIR}/server.pid"
@@ -265,12 +265,27 @@ wait_and_export_after_controller() {
     out="${EXPORT_DIR}/${EXPORT_BASENAME}_${ts}.json"
   fi
 
+
   echo "[*] Exporting model to ${out} ..."
   if curl -fsS --retry 5 --retry-connrefused "${SERVER_URL}/export" -o "${out}"; then
     echo "[*] Export saved: ${out}"
+
+    base="$(basename "${out}")"
+    prefix="${base%.json}_"
+    echo "[*] Generating charts with analytics.charts (prefix='${prefix}') ..."
+
+    (
+      cd "${PROJECT_ROOT}" && \
+      "${PYTHON}" -u -m analytics.charts \
+        --file "${out}" \
+        --outdir "${EXPORT_DIR}" \
+        --prefix "${prefix}"
+    ) && echo "[*] Charts generated under ${EXPORT_DIR}" || echo "[!] Chart generation failed."
+
   else
     echo "[!] Export FAILED (curl could not fetch ${SERVER_URL}/export)"
   fi
+
 
   if [[ "${AUTO_STOP}" = "1" ]]; then
     echo "[*] AUTO_STOP is enabled → stopping all processes"
@@ -298,7 +313,7 @@ Environment overrides:
   ROUNDS, MIN_CLIENTS, CLIENTS, CLIENT_SAMPLES, CLIENT_ROUNDS, CLIENT_LR
   SERVER_HOST, SERVER_PORT
   EXPORT_DIR, EXPORT_BASENAME (default: model_state_summary.json), AUTO_STOP (default: 1)
-  SETTLE_TIMEOUT (default: 10s)
+  SETTLE_TIMEOUT (default: 3s)
 EOF
 }
 
