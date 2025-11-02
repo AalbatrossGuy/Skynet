@@ -3,3 +3,4 @@ requests
 numpy
 scikit-learn
 click
+matplotlib
