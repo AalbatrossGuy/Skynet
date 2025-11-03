@@ -32,7 +32,7 @@ Skynet/
 │ └── __init__.py
 ├── controller/
 │ ├── controller.py
-│ └── __init__.py <br>
+│ └── __init__.py
 ├── models/
 │ ├── crypto.py
 │ ├── models.py
