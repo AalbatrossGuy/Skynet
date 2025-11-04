@@ -22,9 +22,9 @@ PID_DIR="${PROJECT_ROOT}/.pids"
 mkdir -p "${LOG_DIR}" "${PID_DIR}"
 
 EXPORT_DIR="${EXPORT_DIR:-${LOG_DIR}/exports}"
-EXPORT_BASENAME="${EXPORT_BASENAME:-model_state_summary.json}"
+EXPORT_BASENAME="${EXPORT_BASENAME:-export.json}"
 AUTO_STOP="${AUTO_STOP:-1}"
-SETTLE_TIMEOUT="${SETTLE_TIMEOUT:-3}"
+SETTLE_TIMEOUT="${SETTLE_TIMEOUT:-2}"
 mkdir -p "${EXPORT_DIR}"
 
 SERVER_PID_FILE="${PID_DIR}/server.pid"
@@ -35,11 +35,11 @@ PYTHON="${VENV_DIR}/bin/python"
 
 ensure_venv() {
   if [[ ! -x "${PYTHON}" ]]; then
-    echo "[*] Creating virtualenv at ${VENV_DIR}"
+    echo "[INFO] Creating virtualenv at ${VENV_DIR}"
     python3 -m venv "${VENV_DIR}"
   fi
   source "${VENV_DIR}/bin/activate"
-  echo "[*] Installing requirements"
+  echo "[INFO] Installing requirements"
   pip install -r "${REQ_FILE}"
 }
 
@@ -94,7 +94,7 @@ wait_pid_exit() {
 
 start_server() {
   if is_running "${SERVER_PID_FILE}"; then
-    echo "[i] Server already running (pid $(cat "${SERVER_PID_FILE}"))"
+    echo "[ERROR] Server already running (pid $(cat "${SERVER_PID_FILE}"))"
     return 0
   fi
   echo "[*] Starting server ..."
@@ -122,7 +122,7 @@ start_clients() {
 
 start_controller() {
   if is_running "${CONTROLLER_PID_FILE}"; then
-    echo "[i] Controller already running (pid $(cat "${CONTROLLER_PID_FILE}"))"
+    echo "[INFO] Controller already running (pid $(cat "${CONTROLLER_PID_FILE}"))"
     return 0
   fi
   echo "[*] Starting controller (rounds=${ROUNDS}, min_clients=${MIN_CLIENTS}) ..."
@@ -202,18 +202,18 @@ tail_logs() {
 
 wait_and_export_after_controller() {
   if [[ ! -f "${CONTROLLER_PID_FILE}" ]]; then
-    echo "[!] No controller PID file; cannot wait/export"
+    echo "[ERROR] No controller PID file; cannot wait/export"
     return 1
   fi
   local ctrl_pid
   ctrl_pid="$(cat "${CONTROLLER_PID_FILE}")"
 
-  echo "[*] Waiting for controller to complete (pid ${ctrl_pid})..."
+  echo "[INFO] Waiting for controller to complete (pid ${ctrl_pid})..."
   wait_pid_exit "${ctrl_pid}"
   echo "[*] Controller exited."
 
   if ! server_alive; then
-    echo "[!] Server is unreachable after controller exit; attempting export anyway."
+    echo "[ERROR] Server is unreachable after controller exit; attempting export anyway."
   fi
 
   local have_start="0" target_round=""
@@ -222,14 +222,14 @@ wait_and_export_after_controller() {
     target_round=$(( START_ROUND + ROUNDS ))
     echo "[*] Waiting for server training_round to reach ${target_round} (timeout ${SETTLE_TIMEOUT}s) ..."
   else
-    echo "[i] START_ROUND not available → stabilization wait (timeout ${SETTLE_TIMEOUT}s)"
+    echo "[INFO] START_ROUND not available → stabilization wait (timeout ${SETTLE_TIMEOUT}s)"
   fi
 
   local deadline=$(( $(date +%s) + SETTLE_TIMEOUT ))
   local last="-1" same_count=0
   while true; do
     if ! server_alive; then
-      echo -e "\n[!] Server down during settle wait. Continuing to export."
+      echo -e "\n[ERROR] Server down during settle wait. Continuing to export."
       break
     fi
 
@@ -251,7 +251,7 @@ wait_and_export_after_controller() {
     fi
 
     if (( $(date +%s) > deadline )); then
-      echo -e "\n[!] Timed out waiting for server to settle. Continuing to export."
+      echo -e "\n[INFO] Timed out waiting for server to settle. Continuing to export."
       break
     fi
     sleep 1
@@ -266,13 +266,13 @@ wait_and_export_after_controller() {
   fi
 
 
-  echo "[*] Exporting model to ${out} ..."
+  echo "[INFO] Exporting model to ${out} ..."
   if curl -fsS --retry 5 --retry-connrefused "${SERVER_URL}/export" -o "${out}"; then
-    echo "[*] Export saved: ${out}"
+    echo "[INFO] Export saved: ${out}"
 
     base="$(basename "${out}")"
     prefix="${base%.json}_"
-    echo "[*] Generating charts with analytics.charts (prefix='${prefix}') ..."
+    echo "[INFO] Generating charts with analytics.charts (prefix='${prefix}') ..."
 
     (
       cd "${PROJECT_ROOT}" && \
@@ -280,18 +280,18 @@ wait_and_export_after_controller() {
         --file "${out}" \
         --outdir "${EXPORT_DIR}" \
         --prefix "${prefix}"
-    ) && echo "[*] Charts generated under ${EXPORT_DIR}" || echo "[!] Chart generation failed."
+    ) && echo "[INFO] Charts generated under ${EXPORT_DIR}" || echo "[!] Chart generation failed."
 
   else
-    echo "[!] Export FAILED (curl could not fetch ${SERVER_URL}/export)"
+    echo "[ERROR] Export FAILED (curl could not fetch ${SERVER_URL}/export)"
   fi
 
 
   if [[ "${AUTO_STOP}" = "1" ]]; then
-    echo "[*] AUTO_STOP is enabled → stopping all processes"
+    echo "[INFO] AUTO_STOP is enabled → stopping all processes"
     stop_all
   else
-    echo "[i] AUTO_STOP=0 → leaving server/clients running"
+    echo "[INFO] AUTO_STOP=0 → leaving server/clients running"
   fi
 }
 
@@ -313,7 +313,7 @@ Environment overrides:
   ROUNDS, MIN_CLIENTS, CLIENTS, CLIENT_SAMPLES, CLIENT_ROUNDS, CLIENT_LR
   SERVER_HOST, SERVER_PORT
   EXPORT_DIR, EXPORT_BASENAME (default: model_state_summary.json), AUTO_STOP (default: 1)
-  SETTLE_TIMEOUT (default: 3s)
+  SETTLE_TIMEOUT (default: 2s)
 EOF
 }
 
@@ -328,9 +328,9 @@ case "${cmd}" in
     start_clients
 
     if START_ROUND="$(get_training_round)"; then
-      echo "[*] Starting server round is ${START_ROUND}"
+      echo "[INFO] Starting server round is ${START_ROUND}"
     else
-      echo "[i] Could not read starting training_round; proceeding with fallback wait"
+      echo "[INFO] Could not read starting training_round; proceeding with fallback wait"
       START_ROUND=""
     fi
     start_controller
