@@ -61,21 +61,6 @@ Skynet/
 - Python **3.10+**
 - `git`, `curl`, and `bash`
 
-### One-liner (Recommended)
-
-```bash
-ROUNDS="5" MIN_CLIENTS="3" CLIENT_SAMPLES="300" CLIENT_ROUNDS="5" CLIENT_LR="0.5" SERVER_HOST="127.0.0.1"
-SERVER_PORT="8000" curl -fsSL -o install.sh https://kishaloyroy.dev/install.sh
-chmod +x install.sh && ./install.sh && cd Skynet
-./scripts/skynet.sh start
-```
-
-### Install (Don't Run)
-```bash
-ROUNDS="5" MIN_CLIENTS="3" CLIENT_SAMPLES="300" CLIENT_ROUNDS="5" CLIENT_LR="0.5" SERVER_HOST="127.0.0.1"
-SERVER_PORT="8000" bash <(curl -fsSL https://kishaloyroy.dev/install.sh)
-```
-
 ### Manual Setup
 ```bash
 git clone https://github.com/AalbatrossGuy/Skynet.git
